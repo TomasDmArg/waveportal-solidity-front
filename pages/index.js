@@ -1,8 +1,145 @@
 import Head from 'next/head'
 import Image from 'next/image'
-import styles from '../styles/Home.module.css'
+import styles from '../styles/Home.module.scss'
+import { ethers } from "ethers";
+import abi from "../utils/WavePortal.json";
+import React, { useEffect, useState } from "react";
+import { getAddress } from 'ethers/lib/utils';
 
 export default function Home() {
+  const [currentAccount, setCurrentAccount] = useState("");
+  const [allWaves, setAllWaves] = useState([]);
+  const [message, setMessage] = useState("");
+  const contractAddress = "0x3a863Dd66877c667D52b915598520e0b127DD207";
+  const contractABI = abi.abi;
+  const getAddress = (a) => {
+    // Return the first 4 chars, and the last 3
+    return a.substring(0, 4) + "**" + a.substring(a.length - 3);
+  }
+  const getDate = (d) => {
+    // Convert timestamp, to dd/mm/yyyy format
+    return new Date(d).toLocaleDateString();
+  }
+  const checkIfWalletIsConnected = async () => {
+    try {
+      const { ethereum } = window;
+
+      if (!ethereum) {
+        console.log("Make sure you have metamask!");
+        return;
+      } else {
+        console.log("We have the ethereum object", ethereum);
+      }
+
+      const accounts = await ethereum.request({ method: "eth_accounts" });
+
+      if (accounts.length !== 0) {
+        const account = accounts[0];
+        console.log("Found an authorized account:", account);
+        setCurrentAccount(account);
+      } else {
+        console.log("No authorized account found")
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  /**
+  * Implement your connectWallet method here
+  */
+  const connectWallet = async () => {
+    try {
+      const { ethereum } = window;
+
+      if (!ethereum) {
+        alert("Get MetaMask!");
+        return;
+      }
+
+      const accounts = await ethereum.request({ method: "eth_requestAccounts" });
+
+      console.log("Connected", accounts[0]);
+      setCurrentAccount(accounts[0]);
+    } catch (error) {
+      console.log(error)
+    }
+  }
+  const getAllWaves = async () => {
+    try {
+      const { ethereum } = window;
+      if (ethereum) {
+        const provider = new ethers.providers.Web3Provider(ethereum);
+        const signer = provider.getSigner();
+        const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
+
+        /*
+         * Call the getAllWaves method from your Smart Contract
+         */
+        const waves = await wavePortalContract.getAllWaves();
+
+
+        /*
+         * We only need address, timestamp, and message in our UI so let's
+         * pick those out
+         */
+        let wavesCleaned = [];
+        waves.forEach(wave => {
+          wavesCleaned.push({
+            address: wave.waver,
+            timestamp: new Date(wave.timestamp * 1000),
+            message: wave.message
+          });
+        });
+
+        /*
+         * Store our data in React State
+         */
+        setAllWaves(wavesCleaned);
+      } else {
+        console.log("Ethereum object doesn't exist!")
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+  const wave = async () => {
+    try {
+      const { ethereum } = window;
+
+      if (ethereum) {
+        const provider = new ethers.providers.Web3Provider(ethereum);
+        const signer = provider.getSigner();
+
+
+        const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
+
+        let count = await wavePortalContract.getTotalWaves();
+        console.log("Retrieved total wave count...", count.toNumber());
+        const waveTxn = await wavePortalContract.wave(message);
+        console.log("Mining...", waveTxn.hash);
+
+        await waveTxn.wait();
+        console.log("Mined -- ", waveTxn.hash);
+
+        count = await wavePortalContract.getTotalWaves();
+        console.log("Retrieved total wave count...", count.toNumber());
+        getAllWaves();
+      } else {
+        console.log("Ethereum object doesn't exist!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+  useEffect(() => {
+    checkIfWalletIsConnected();
+  }, [])
+  useEffect(() => {
+    if (currentAccount) {
+      getAllWaves();
+    }
+  }, [currentAccount])
   return (
     <div className={styles.container}>
       <Head>
@@ -12,58 +149,43 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
+        <section className="mainContainer">
+          <section className="dataContainer">
+            <h2 className={styles.title}>
+              👋 Hey there!
+            </h2>
 
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
+            <p className="bio">
+              This’s my first solidity app,  deployed on Rinkeby (Ethereum),
+              connect a wallet and send a message to see it in the blockchain
             </p>
-          </a>
-        </div>
+            <textarea className={styles.message} onChange={(e) => setMessage(e.target.value)} placeholder="Write here a message..." ></textarea>
+
+
+            {!currentAccount ? (
+              <button className={styles.secondaryBtn} onClick={connectWallet}>
+                Connect Wallet
+              </button>
+            ) : (
+              <button className={styles.mainBtn} onClick={wave}>
+                Wave at Me
+              </button>
+            )}
+            <h3 className={styles.subtitle}>
+              📜 All Waves
+            </h3>
+            {allWaves.map((wave, index) => {
+              return (
+                <section key={index} className={styles.entry}>
+                  <p>Address: <br /><a className={styles.address} href={"https://rinkeby.etherscan.io/address/" + wave.address} target="_blank" rel="noopener noreferrer">{getAddress(wave.address)}</a></p>
+                  <p>Time: <br />{getDate(wave.timestamp)}</p>
+                  <p>Message: <br /> {wave.message}</p>
+                </section>)
+            })}
+          </section>
+        </section>
       </main>
 
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
-          </span>
-        </a>
-      </footer>
     </div>
   )
 }
