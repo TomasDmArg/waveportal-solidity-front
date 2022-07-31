@@ -10,7 +10,7 @@ export default function Home() {
   const [currentAccount, setCurrentAccount] = useState("");
   const [allWaves, setAllWaves] = useState([]);
   const [message, setMessage] = useState("");
-  const contractAddress = "0x3a863Dd66877c667D52b915598520e0b127DD207";
+  const contractAddress = "0x6124b3E6f1e80beb49EddA5e87795821852e86D5";
   const contractABI = abi.abi;
   const getAddress = (a) => {
     // Return the first 4 chars, and the last 3
